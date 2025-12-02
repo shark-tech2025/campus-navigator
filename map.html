@@ -205,12 +205,13 @@
         div.onclick = () => {
   startRouting(loc.coords);
 
-  // Close search results
-  resultsDiv.innerHTML = "";
+  // show clicked item in search bar
+  searchInput.value = loc.name;
 
-  // Hide entire search bar after selection
-  document.getElementById("searchBox").style.display = "none";
+  // clear results after clicking
+  resultsDiv.innerHTML = "";
 };
+
   // clear search box
         resultsDiv.appendChild(div);
       });
@@ -246,5 +247,6 @@
   </script>
 </body>
 </html>
+
 
 
