@@ -203,9 +203,15 @@
         div.classList.add("result-item");
         div.textContent = loc.name;
         div.onclick = () => {
-          startRouting(loc.coords);
-          resultsDiv.innerHTML = "";   // hide results
-          searchInput.value = "";   };   // clear search box
+  startRouting(loc.coords);
+
+  // Close search results
+  resultsDiv.innerHTML = "";
+
+  // Hide entire search bar after selection
+  document.getElementById("searchBox").style.display = "none";
+};
+  // clear search box
         resultsDiv.appendChild(div);
       });
     });
@@ -240,4 +246,5 @@
   </script>
 </body>
 </html>
+
 
