@@ -13,52 +13,75 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
 
   <style>
-    #map {
-      width: 100%;
-      height: 500px;
-      border-radius: 10px;
-      margin-top: 20px;
-    }
+  #map {
+    width: 100%;
+    height: 500px;
+    border-radius: 10px;
+    margin-top: 20px;
+    position: relative;
+  }
 
-    #searchBox {
-      position: absolute;
-      top: 90px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #fff;
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2);
-      z-index: 9999;
-      width: 80%;
-      max-width: 400px;
-    }
+  /* Search box better spaced */
+  #searchBox {
+    position: absolute;
+    top: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    padding: 14px;
+    border-radius: 10px;
+    box-shadow: 0 0 12px rgba(0,0,0,0.25);
+    z-index: 9999;
+    width: 80%;
+    max-width: 420px;
+  }
 
-    #searchInput {
-      width: 100%;
-      padding: 10px;
-      border-radius: 6px;
-      border: 1px solid #aaa;
-    }
+  #searchInput {
+    width: 100%;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #aaa;
+    font-size: 16px;
+  }
 
-    #results {
-      background: #fff;
-      margin-top: 5px;
-      max-height: 200px;
-      overflow-y: auto;
-      border-radius: 6px;
-    }
+  #results {
+    background: #fff;
+    margin-top: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+  }
 
-    .result-item {
-      padding: 10px;
-      cursor: pointer;
-      border-bottom: 1px solid #ddd;
-    }
+  .result-item {
+    padding: 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    font-size: 15px;
+  }
 
-    .result-item:hover {
-      background: #f2f2f2;
-    }
-  </style>
+  .result-item:hover {
+    background: #f4f4f4;
+  }
+
+  /* Routing instruction panel on right side */
+  .leaflet-routing-container {
+    width: 280px !important;
+    max-height: 450px;
+    overflow-y: auto;
+    right: 10px !important;
+    top: 140px !important;
+    position: absolute !important;
+    background: white !important;
+    border-radius: 10px !important;
+    box-shadow: 0 0 12px rgba(0,0,0,0.25) !important;
+    z-index: 5000 !important;
+  }
+
+  .leaflet-routing-collapse-btn {
+    display: none !important;
+  }
+</style>
 
 </head>
 <body>
@@ -180,7 +203,10 @@
         const div = document.createElement("div");
         div.classList.add("result-item");
         div.textContent = loc.name;
-        div.onclick = () => startRouting(loc.coords);
+        div.onclick = () => {
+          startRouting(loc.coords);
+          resultsDiv.innerHTML = "";   // hide results
+          searchInput.value = "";   };   // clear search box
         resultsDiv.appendChild(div);
       });
     });
