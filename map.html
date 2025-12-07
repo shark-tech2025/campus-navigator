@@ -1,91 +1,56 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Map | Campus Navigator</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SNS Campus Navigator — Optimized (Extreme Mode)</title>
 
-  <!-- Your existing CSS -->
+  <!-- Performance hints -->
+  <meta http-equiv="Cache-Control" content="max-age=604800, public">
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://server.arcgisonline.com">
+  <link rel="preconnect" href="https://graphhopper.com">
+
+  <!-- Your existing CSS (keeps page look) -->
   <link rel="stylesheet" href="styles.css" />
 
-  <!-- Leaflet CSS -->
+  <!-- Leaflet + MarkerCluster CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
 
   <style>
-  #map {
-    width: 100%;
-    height: 500px;
-    border-radius: 10px;
-    margin-top: 20px;
-    position: relative;
-  }
+    /* keep your search box and routing UI look — minor adjustments for clustering and instruction panel */
+    #map { width:100%; height:500px; border-radius:10px; margin-top:20px; position:relative; }
+    #searchBox {
+      position:absolute; top:110px; left:50%; transform:translateX(-50%);
+      background:#fff; padding:14px; border-radius:10px; box-shadow:0 0 12px rgba(0,0,0,0.25);
+      z-index:9999; width:80%; max-width:420px;
+    }
+    #searchInput { width:100%; padding:12px; border-radius:6px; border:1px solid #aaa; font-size:16px; }
+    #results { background:#fff; margin-top:8px; max-height:220px; overflow-y:auto; border-radius:6px; border:1px solid #ddd; }
+    .result-item { padding:12px; cursor:pointer; border-bottom:1px solid #eee; font-size:15px; }
+    .result-item:hover{ background:#f4f4f4; }
 
-  /* Search box better spaced */
-  #searchBox {
-    position: absolute;
-    top: 110px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #fff;
-    padding: 14px;
-    border-radius: 10px;
-    box-shadow: 0 0 12px rgba(0,0,0,0.25);
-    z-index: 9999;
-    width: 80%;
-    max-width: 420px;
-  }
+    /* instruction panel (right side) */
+    #routeInstructions {
+      position:absolute; right:12px; top:140px; width:320px; max-height:420px; overflow:auto;
+      background:#fff; border-radius:10px; box-shadow:0 0 12px rgba(0,0,0,0.25); z-index:5000;
+      padding:10px; display:none;
+    }
+    #routeInstructions h4 { margin:6px 0 8px 0; font-size:16px; color:#1e3a8a; }
+    #routeInstructions ol { padding-left:18px; margin:0; font-size:14px; }
+    #routeInstructions .meta { font-size:13px; color:#444; margin-bottom:6px; }
 
-  #searchInput {
-    width: 100%;
-    padding: 12px;
-    border-radius: 6px;
-    border: 1px solid #aaa;
-    font-size: 16px;
-  }
+    /* cluster icon tweak (visual only) */
+    .marker-cluster-small { background-color: rgba(30,58,138,0.9); }
+    .marker-cluster-small div { background-color: rgba(255,255,255,0.9); color:#1e3a8a; }
 
-  #results {
-    background: #fff;
-    margin-top: 8px;
-    max-height: 220px;
-    overflow-y: auto;
-    border-radius: 6px;
-    border: 1px solid #ddd;
-  }
-
-  .result-item {
-    padding: 12px;
-    cursor: pointer;
-    border-bottom: 1px solid #eee;
-    font-size: 15px;
-  }
-
-  .result-item:hover {
-    background: #f4f4f4;
-  }
-
-  /* Routing instruction panel on right side */
-  .leaflet-routing-container {
-    width: 280px !important;
-    max-height: 450px;
-    overflow-y: auto;
-    right: 10px !important;
-    top: 140px !important;
-    position: absolute !important;
-    background: white !important;
-    border-radius: 10px !important;
-    box-shadow: 0 0 12px rgba(0,0,0,0.25) !important;
-    z-index: 5000 !important;
-  }
-
-  .leaflet-routing-collapse-btn {
-    display: none !important;
-  }
-</style>
-
+    /* keep routing container from leaflet-routing-machine hidden (we use our own) */
+    .leaflet-routing-container { display:none !important; }
+  </style>
 </head>
 <body>
-
   <header>
     <h1>Campus Navigator</h1>
     <nav>
@@ -98,156 +63,327 @@
 
   <main>
     <h2>Campus Map</h2>
-    <p>Navigate anywhere inside SNS Institutions with real-time GPS.</p>
+    <p>Navigate inside SNS campus — clustered markers, instant search, and fast routing.</p>
 
     <div id="searchBox">
       <input id="searchInput" type="text" placeholder="Search SNS Campus Locations..." />
-      <div id="results"></div>
+      <div id="results" role="listbox"></div>
     </div>
 
-    <div id="map"></div>
+    <div id="map" aria-label="Campus map"></div>
+
+    <!-- Custom instruction panel -->
+    <div id="routeInstructions" aria-live="polite">
+      <h4>Route instructions</h4>
+      <div class="meta" id="routeSummary">No active route.</div>
+      <ol id="routeSteps"></ol>
+      <button id="closeRoute" style="margin-top:8px;padding:8px 12px;border-radius:6px;border:none;background:#1e3a8a;color:#fff;cursor:pointer;">Close</button>
+    </div>
   </main>
 
   <footer>© 2025 Campus Navigator. All rights reserved.</footer>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+  <!-- Non-blocking scripts (defer) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" defer></script>
 
   <script>
-    // -----------------------------
-    // SNS CAMPUS MAP INITIALIZATION (Satellite View)
-    // -----------------------------
-    const map = L.map("map").setView([11.1001, 76.9979], 17);
+  // ---- Extreme-Mode Map Page (cluster ON) ----
+  // GraphHopper key (your key inserted)
+  const GH_KEY = "6c2948c7-a353-4856-a4a7-011543d95011";
+  document.addEventListener("DOMContentLoaded", async () => {
+    // wait for scripts to be ready
+    await waitForLeaflet();
 
-    // 🌍 Satellite Tile Layer (FREE + No API Key)
-    L.tileLayer(
+    // fast map init
+    const map = L.map("map", { zoomControl: true }).setView([11.100904813312273, 77.02659390277283], 25);
+
+    // Satellite tiles (Esri) — keep but smaller maxZoom for speed
+    const tileLayer = L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      {
-        maxZoom: 22,
-        attribution: "© Esri — Satellite Imagery"
-      }
+      { maxZoom: 19, attribution: "© Esri — Satellite Imagery" }
     ).addTo(map);
 
-    // -----------------------------
-    // SNS CAMPUS LOCATION DATA (Real Coordinates)
-    // -----------------------------
+    // small perf tweaks
+    map.options.markerZoomAnimation = false;
+    map.options.fadeAnimation = false;
+
+    // ---------- Locations (your provided list) ----------
     const locations = [
-  { name: "Department of Mechatronics", coords: [11.100529192537177, 77.02716309751852] },
-  { name: "SNS College of Technology", coords: [11.100223380401568, 77.0263032549085] },
-  { name: "Department of Civil Engineering", coords: [11.09970735808378, 77.02662250608721] },
-  { name: "Drone Lab", coords: [11.099867430069743, 77.02710087807108] },
-  { name: "EEE Department", coords: [11.100028631248655, 77.02716936371525] },
-  { name: "Biomedical Engineering", coords: [11.099821214534456, 77.02727305857348] },
-  { name: "SNS Innovation Hub", coords: [11.100135086477035, 77.02737773434725] },
-  { name: "SNS College of Physiotherapy", coords: [11.100925866632158, 77.02788457393324] },
-  { name: "SNS College of Allied and Health Science", coords: [11.100825385932994, 77.02791968866512] },
-  { name: "SNS College of Pharmacy and Health Sciences", coords: [11.10113412323229, 77.02756865392408] },
-  { name: "Department of Mechanical Engineering", coords: [11.101357676038338, 77.02717030733425] },
-  { name: "SNS College of Engineering Shuttle Court", coords: [11.101948973464541, 77.02757892717494] },
-  { name: "SNS Open Auditorium", coords: [11.102587750264112, 77.02791180027195] },
-  { name: "Department of Electrical and Electronics Engineering", coords: [11.103363334550187, 77.027408910633] },
-  { name: "SNS College of Engineering Canteen", coords: [11.103424306439646, 77.02771362593705] },
-  { name: "SPINE - The SNS Activity Center", coords: [11.104013006202337, 77.02642810329823] }
-
-
+      { name: "Department of Mechatronics", coords: [11.100529192537177, 77.02716309751852] },
+      { name: "SNS College of Technology", coords: [11.100223380401568, 77.0263032549085] },
+      { name: "Department of Civil Engineering", coords: [11.09970735808378, 77.02662250608721] },
+      { name: "Drone Lab", coords: [11.099867430069743, 77.02710087807108] },
+      { name: "EEE Department", coords: [11.100028631248655, 77.02716936371525] },
+      { name: "Biomedical Engineering", coords: [11.099821214534456, 77.02727305857348] },
+      { name: "SNS Innovation Hub", coords: [11.100135086477035, 77.02737773434725] },
+      { name: "SNS College of Physiotherapy", coords: [11.100925866632158, 77.02788457393324] },
+      { name: "SNS College of Allied and Health Science", coords: [11.100825385932994, 77.02791968866512] },
+      { name: "SNS College of Pharmacy and Health Sciences", coords: [11.10113412323229, 77.02756865392408] },
+      { name: "Department of Mechanical Engineering", coords: [11.101357676038338, 77.02717030733425] },
+      { name: "SNS College of Engineering Shuttle Court", coords: [11.101948973464541, 77.02757892717494] },
+      { name: "SNS Open Auditorium", coords: [11.102587750264112, 77.02791180027195] },
+      { name: "Department of Electrical and Electronics Engineering", coords: [11.103363334550187, 77.027408910633] },
+      { name: "SNS College of Engineering Canteen", coords: [11.103424306439646, 77.02771362593705] },
+      { name: "SPINE - The SNS Activity Center", coords: [11.104013006202337, 77.02642810329823] }
     ];
 
-    locations.forEach(loc => {
-      L.marker(loc.coords).bindPopup(`<b>${loc.name}</b>`).addTo(map);
+    // ---------- Marker clustering ----------
+    const markers = L.markerClusterGroup({
+      chunkedLoading: true,
+      chunkProgress: updateClusterProgress, // optional progress callback
+      showCoverageOnHover: false,
+      spiderfyOnMaxZoom: true,
+      iconCreateFunction: function (cluster) {
+        const count = cluster.getChildCount();
+        const size = count < 10 ? 'small' : (count < 50 ? 'medium' : 'large');
+        return L.divIcon({ html: `<div><span>${count}</span></div>`, className: 'marker-cluster marker-cluster-' + size, iconSize: L.point(40, 40) });
+      }
     });
 
-    // -----------------------------
-    // LIVE USER LOCATION TRACKING
-    // -----------------------------
-    let userMarker;
-
-    function trackUser() {
-      navigator.geolocation.watchPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-
-          if (!userMarker) {
-            userMarker = L.marker([lat, lon], { title: "You" })
-              .addTo(map)
-              .bindPopup("You are here");
-          } else {
-            userMarker.setLatLng([lat, lon]);
-          }
-        },
-        () => alert("Please enable GPS for live navigation."),
-        { enableHighAccuracy: true }
-      );
+    // create markers, but don't add to map individually
+    const markerObjects = [];
+    for (let i = 0; i < locations.length; i++) {
+      const loc = locations[i];
+      const m = L.marker(loc.coords, { title: loc.name });
+      m.bindPopup(`<b>${escapeHtml(loc.name)}</b><br/><button onclick="routeFromPopup(${loc.coords[0]},${loc.coords[1]})">Route here</button>`);
+      markerObjects.push({ loc, marker: m });
     }
 
-    trackUser();
+    // add in batches to avoid freeze
+    batchAddMarkers(markerObjects, markers, map);
 
-    // -----------------------------
-    // SEARCH SYSTEM
-    // -----------------------------
+    // add cluster layer to map
+    map.addLayer(markers);
+
+    // ---------- Pre-index search (fast) ----------
+    const nameIndex = locations.map(l => ({ name: l.name, lc: l.name.toLowerCase(), coords: l.coords }));
     const searchInput = document.getElementById("searchInput");
     const resultsDiv = document.getElementById("results");
+    searchInput.addEventListener("input", onSearchInput);
 
-    searchInput.addEventListener("input", () => {
-      const query = searchInput.value.toLowerCase();
+    function onSearchInput(e) {
+      const q = (e.target.value || "").trim().toLowerCase();
       resultsDiv.innerHTML = "";
-
-      if (query === "") return;
-
-      const matched = locations.filter(loc =>
-        loc.name.toLowerCase().includes(query)
-      );
-
-      matched.forEach(loc => {
+      if (!q) return;
+      // prefix + contains search, limited to top 8 matches
+      const matches = nameIndex.filter(x => x.lc.includes(q)).slice(0, 8);
+      for (const m of matches) {
         const div = document.createElement("div");
-        div.classList.add("result-item");
-        div.textContent = loc.name;
+        div.className = "result-item";
+        div.textContent = m.name;
         div.onclick = () => {
-  startRouting(loc.coords);
-
-  // show clicked item in search bar
-  searchInput.value = loc.name;
-
-  // clear results after clicking
-  resultsDiv.innerHTML = "";
-};
-
-  // clear search box
+          searchInput.value = m.name; // show selected
+          resultsDiv.innerHTML = "";
+          flyToAndRoute(m.coords);
+        };
         resultsDiv.appendChild(div);
-      });
+      }
+    }
+
+    // ---------- user tracking (prefetch location to speed permission prompt) ----------
+    let userMarker = null;
+    let watchId = null;
+    function startLocationWatch() {
+      if (!navigator.geolocation) return;
+      // ask permission early (prefetch)
+      navigator.geolocation.getCurrentPosition(() => {}, () => {}, { maximumAge: 60000, timeout: 3000 });
+      watchId = navigator.geolocation.watchPosition((pos) => {
+        const lat = pos.coords.latitude, lng = pos.coords.longitude;
+        if (!userMarker) {
+          userMarker = L.circleMarker([lat, lng], { radius: 7, color: '#1e3a8a', fillColor:'#1e3a8a', fillOpacity:0.9 }).addTo(map);
+        } else userMarker.setLatLng([lat, lng]);
+      }, err => { console.warn("geo watch err", err); }, { enableHighAccuracy: false, maximumAge: 2000, timeout: 5000 });
+    }
+    startLocationWatch();
+
+    // ---------- route drawing / GraphHopper integration ----------
+    const GH_BASE = "https://graphhopper.com/api/1/route";
+    const ROUTE_CACHE_KEY = "gh_route_cache_v1";
+    const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24h
+
+    // load cache
+    let routeCache = {};
+    try { routeCache = JSON.parse(localStorage.getItem(ROUTE_CACHE_KEY)) || {}; } catch(e) { routeCache = {}; }
+
+    // function to request route from GraphHopper (with timeout and cache)
+    async function getRouteFromGraphHopper(start, end) {
+      const key = routeKey(start, end);
+      // return cached if fresh
+      const cached = routeCache[key];
+      if (cached && (Date.now() - cached.t) < CACHE_TTL_MS) {
+        return cached.data;
+      }
+      // build request (points_encoded=false to get coords array)
+      const url = `${GH_BASE}?point=${start[0]},${start[1]}&point=${end[0]},${end[1]}&vehicle=foot&points_encoded=false&key=${GH_KEY}&locale=en&instructions=true`;
+      // fetch with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 7000); // 7s timeout
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
+        if (!res.ok) throw new Error("Routing error " + res.status);
+        const json = await res.json();
+        // cache and return
+        routeCache[key] = { t: Date.now(), data: json };
+        try { localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(routeCache)); } catch(e) { /* ignore */ }
+        return json;
+      } catch (err) {
+        clearTimeout(timeout);
+        console.warn("GraphHopper fetch failed:", err);
+        throw err;
+      }
+    }
+
+    // draw route polyline and show instructions
+    let activeRouteLayer = null;
+    async function showRoute(start, end) {
+      // clear previous
+      if (activeRouteLayer) { map.removeLayer(activeRouteLayer); activeRouteLayer = null; }
+      document.getElementById("routeInstructions").style.display = 'none';
+      document.getElementById("routeSummary").textContent = 'Calculating route...';
+      document.getElementById("routeSteps").innerHTML = '';
+
+      try {
+        const data = await getRouteFromGraphHopper(start, end);
+        // GraphHopper returns paths array
+        if (!data.paths || !data.paths.length) throw new Error("No route");
+        const path = data.paths[0];
+        // coordinates: path.points.coordinates is [ [lon,lat], ... ] if points_encoded=false
+        const coords = (path.points && path.points.coordinates) ? path.points.coordinates.map(c => [c[1], c[0]]) : [];
+        if (coords.length === 0) throw new Error("No coords");
+
+        // create polyline
+        activeRouteLayer = L.polyline(coords, { color:'#1e3a8a', weight:5, opacity:0.9 }).addTo(map);
+        map.fitBounds(activeRouteLayer.getBounds(), { padding: [40,40] });
+
+        // show summary & instructions
+        const summaryEl = document.getElementById("routeSummary");
+        const stepsEl = document.getElementById("routeSteps");
+        const dist = path.distance || 0;
+        const timeS = Math.round((path.time || 0)/1000);
+        summaryEl.textContent = `Distance: ${Math.round(dist)} m • ETA: ${Math.round(timeS/60)} min`;
+        stepsEl.innerHTML = '';
+        if (path.instructions && path.instructions.length) {
+          for (const instr of path.instructions) {
+            const li = document.createElement('li');
+            li.innerHTML = `${escapeHtml(instr.text || instr.sign || '')} <small>(${Math.round(instr.distance||0)} m)</small>`;
+            stepsEl.appendChild(li);
+          }
+        } else if (path.snapped_waypoints) {
+          const li = document.createElement('li');
+          li.textContent = 'Follow route';
+          stepsEl.appendChild(li);
+        } else {
+          stepsEl.innerHTML = '<li>Instructions not available.</li>';
+        }
+        document.getElementById("routeInstructions").style.display = 'block';
+      } catch (err) {
+        document.getElementById("routeSummary").textContent = 'Routing failed — try again or switch map.';
+        document.getElementById("routeInstructions").style.display = 'block';
+        console.warn(err);
+      }
+    }
+
+    // helper to create cache key (rounded coordinates)
+    function routeKey(a,b) {
+      return `${round5(a[0])},${round5(a[1])}_${round5(b[0])},${round5(b[1])}`;
+    }
+    function round5(n){ return Math.round(n*100000)/100000; }
+
+    // UI helper: fly to place and route from user's last known location (or prompt if none)
+    function flyToAndRoute(coords) {
+      map.setView(coords, 18, { animate: true });
+      // if we have user location
+      if (userMarker) {
+        const userLatLng = userMarker.getLatLng();
+        showRoute([userLatLng.lat, userLatLng.lng], coords);
+      } else {
+        // ask for single position and then route
+        navigator.geolocation.getCurrentPosition(pos => {
+          showRoute([pos.coords.latitude, pos.coords.longitude], coords);
+        }, err => {
+          alert('Allow location or click on map to set start point.');
+        }, { enableHighAccuracy: false, timeout: 7000 });
+      }
+    }
+
+    // expose for popup button
+    window.routeFromPopup = function(lat, lon) {
+      const dest = [lat, lon];
+      flyToAndRoute(dest);
+      // keep popup closed and search results hidden
+      document.getElementById("results").innerHTML = "";
+      document.getElementById("searchInput").value = '';
+    };
+
+    // close route panel button
+    document.getElementById("closeRoute").addEventListener('click', ()=> {
+      if (activeRouteLayer) { map.removeLayer(activeRouteLayer); activeRouteLayer = null; }
+      document.getElementById("routeInstructions").style.display = 'none';
     });
 
-    // -----------------------------
-    // ROUTING SYSTEM (Like Google Maps)
-    // -----------------------------
-    let routeControl;
+    // function used by marker cluster chunk loader (optional)
+    function updateClusterProgress(processed, total) {
+      // you could show a tiny loader if desired; we keep silent for UI simplicity
+      // console.log(`cluster ${processed}/${total}`);
+    }
 
-    function startRouting(destination) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const userLoc = [pos.coords.latitude, pos.coords.longitude];
+    // helper: batch add markers to cluster to avoid UI freeze
+    function batchAddMarkers(markerList, clusterGroup, mapRef, batchSize=6, delay=30) {
+      let i = 0;
+      function addChunk() {
+        const end = Math.min(i + batchSize, markerList.length);
+        for (; i < end; i++) clusterGroup.addLayer(markerList[i].marker);
+        if (i < markerList.length) setTimeout(addChunk, delay);
+      }
+      addChunk();
+    }
 
-        if (routeControl) {
-          map.removeControl(routeControl);
+    // ---------- tile prefetch around view (warm cache) ----------
+    prefetchTilesAround(map.getCenter(), map.getZoom(), 2);
+
+    // ---------- small util functions ----------
+    function escapeHtml(text) { return (text||'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    // prefetch function: requests a few tiles around a center at given zooms
+    function prefetchTilesAround(center, zoom, radiusTiles=1) {
+      try {
+        const z = Math.min(zoom, 18);
+        const tileSize = 256;
+        const tileLayerUrl = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+        // compute tile X/Y using Web Mercator projection formulas
+        const lat = center.lat, lon = center.lng;
+        const n = Math.pow(2, z);
+        const xt = Math.floor((lon + 180) / 360 * n);
+        const yt = Math.floor((1 - Math.log(Math.tan(lat * Math.PI/180) + 1/Math.cos(lat * Math.PI/180)) / Math.PI) / 2 * n);
+        for (let dx=-radiusTiles; dx<=radiusTiles; dx++){
+          for (let dy=-radiusTiles; dy<=radiusTiles; dy++){
+            const x = xt + dx, y = yt + dy;
+            if (x<0||y<0) continue;
+            const url = tileLayerUrl.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+            const img = new Image();
+            img.src = url; // browser will cache
+          }
         }
+      } catch(e) { /* ignore */ }
+    }
 
-        routeControl = L.Routing.control({
-          waypoints: [
-            L.latLng(userLoc[0], userLoc[1]),
-            L.latLng(destination[0], destination[1])
-          ],
-          lineOptions: {
-            addWaypoints: false
-          },
-          router: L.Routing.osrmv1({
-            serviceUrl: "https://router.project-osrm.org/route/v1"
-          }),
-        }).addTo(map);
+    // ---------- utility to wait for Leaflet (defer script load) ----------
+    function waitForLeaflet() {
+      return new Promise((resolve) => {
+        const check = () => {
+          if (window.L && window.L.marker) return resolve();
+          setTimeout(check, 50);
+        };
+        check();
       });
     }
+
+    // ---------- expose a method to programmatically route (if needed) ----------
+    window.flyToAndRoute = flyToAndRoute;
+
+  }); // DOMContentLoaded end
   </script>
 </body>
 </html>
-
-
-
-
